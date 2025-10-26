@@ -1,0 +1,99 @@
+replicaCount: 1
+
+image:
+  repository: ora-web
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+fullnameOverride: "web"
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 2000
+  runAsNonRoot: true
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+  hosts:
+    - host: ora.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+
+volumes:
+  - name: tmp
+    emptyDir: {}
+  - name: nginx-run
+    emptyDir: {}
+  - name: nginx-cache
+    emptyDir: {}
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+  - name: nginx-run
+    mountPath: /run
+  - name: nginx-cache
+    mountPath: /var/cache/nginx
+
+envVars:
+  - name: VITE_AUTH_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/auth"
+  - name: VITE_PROFILE_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/profile"
+  - name: VITE_LEARNING_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/learning"
+  - name: VITE_SCHEDULING_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/scheduling"  
+  - name: VITE_CHAT_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/chat"
+  - name: VITE_PAYMENT_SERVICE_URL
+    value: "https://api.127.0.0.1.nip.io/payment"
+  - name: VITE_KEYCLOAK_BASE_URL
+    value: "https://keycloak.127.0.0.1.nip.io"
+  - name: VITE_KEYCLOAK_REALM
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: auth.keycloak.realm
+  - name: VITE_KEYCLOAK_CLIENT_ID
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: auth.keycloak.authClientId

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-cat <<EOF > /usr/share/nginx/html/env.js
+cat <<EOF > /tmp/env.js
 window._env_ = {
   VITE_KEYCLOAK_BASE_URL: "${VITE_KEYCLOAK_BASE_URL}",
   VITE_KEYCLOAK_REALM: "${VITE_KEYCLOAK_REALM}",
