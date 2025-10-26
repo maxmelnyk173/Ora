@@ -22,9 +22,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddEnvironmentVariables();
 
 const string corsPolicy = "CorsPolicy";
-builder.Services.AddCors(o =>
+builder.Services.AddCors(options =>
 {
-    o.AddPolicy(corsPolicy,
+    options.AddPolicy(corsPolicy,
         pb =>
         {
             pb.WithOrigins(builder.Configuration["ALLOWED_ORIGINS"]?.Split(","))
@@ -33,6 +33,7 @@ builder.Services.AddCors(o =>
         });
 });
 
+builder.Services.AddHealthChecks();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddOpenApi(o => { o.AddDocumentTransformer<BearerSecuritySchemeTransformer>(); });
 
@@ -51,9 +52,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         var keycloakOptions = builder.Configuration.GetSection(nameof(KeycloakOptions)).Get<KeycloakOptions>();
         ArgumentNullException.ThrowIfNull(keycloakOptions);
 
+        o.RequireHttpsMetadata = false;
+
         o.Authority = keycloakOptions.Authority;
         o.Audience = keycloakOptions.Audience;
-        o.RequireHttpsMetadata = false;
 
         o.TokenValidationParameters = new TokenValidationParameters
         {
@@ -64,17 +66,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = keycloakOptions.Audience,
             RoleClaimType = keycloakOptions.RoleAddress
         };
-
-        o.MetadataAddress = keycloakOptions.MetadataAddress;
     });
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy(AuthorizationPolicies.RequireEducatorRole, p => p.RequireClaim(ClaimTypes.Role, KeycloakRoles.EducatorRole))
     .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build());
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
-builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(connectionString).UseSnakeCaseNamingConvention());
+var dbOptions = builder.Configuration.GetSection(nameof(DbOptions)).Get<DbOptions>();
+ArgumentNullException.ThrowIfNull(dbOptions);
+builder.Services.AddDbContext<AppDbContext>(o => o.UseNpgsql(dbOptions.GetConnectionString()).UseSnakeCaseNamingConvention());
 
 builder.Services.AddValidatorsFromAssembly(typeof(Program).Assembly);
 
@@ -113,6 +113,10 @@ app.UseSerilogRequestLogging();
 app.MapPrometheusScrapingEndpoint();
 app.UseAuthentication();
 app.UseAuthorization();
+
+app.MapHealthChecks("/health/readiness").AllowAnonymous();
+app.MapHealthChecks("/health/liveness").AllowAnonymous();
+
 app.MapCategoryEndpoints();
 app.MapProductEndpoints();
 app.MapEnrollmentEndpoints();
