@@ -1,0 +1,134 @@
+1) cd ..\helm-charts\platform\
+
+2) 
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add opentelemetry-helm https://open-telemetry.github.io/opentelemetry-helm-charts
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+3) minikube start --cpus=4 --memory=7000
+
+4) minikube addons enable metrics-server
+
+5) helm install prometheus-crds prometheus-community/prometheus-operator-crds --version 22.0.2 -n ora --create-namespace
+
+6) helm install platform . -n ora `
+    -f values.yaml `
+    -f services/postgresql-values.yaml `
+    -f services/keycloak-values.yaml `
+    -f services/rabbitmq-values.yaml `
+    -f services/otel-values.yaml `
+    -f services/prometheus-values.yaml `
+    -f services/loki-values.yaml `
+    -f services/tempo-values.yaml `
+    -f services/grafana-values.yaml `
+    -f services/ingress-nginx-values.yaml
+
+7) kubectl port-forward pod/postgres-0 5433:5432 -n ora
+
+8) cd ..\..\..\..\backend\auth\
+
+9) docker build -t ora-auth:latest .
+
+10) minikube image load ora-auth:latest
+
+11) cd k8s
+
+12) helm install auth-service . -n ora -f values.yaml
+
+12) cd cd ..\..\profile\
+
+13) docker run --rm `
+    -v "${PWD}/migrations/changelog:/liquibase/changelog" `
+    liquibase/liquibase:4.31.1-alpine `
+    "--search-path=/liquibase/changelog" `
+    "--changelog-file=db.changelog-master.xml" `
+    "--url=jdbc:postgresql://host.docker.internal:5433/profile" `
+    "--username=profile" `
+    "--password=password" `
+    update
+
+14) docker build -t ora-profile:latest .
+
+15) minikube image load ora-profile:latest
+
+16) cd k8s
+
+17) helm install profile-service . -n ora -f values.yaml
+
+17) cd ..\..\learning\
+
+18) docker run --rm `
+    -v "${PWD}/migrations/changelog:/liquibase/changelog" `
+    liquibase/liquibase:4.31.1-alpine `
+    "--search-path=/liquibase/changelog" `
+    "--changelog-file=db.changelog-master.xml" `
+    "--url=jdbc:postgresql://host.docker.internal:5433/learning" `
+    "--username=learning" `
+    "--password=password" `
+    update
+
+19) docker build -t ora-learning:latest .
+
+20) minikube image load ora-learning:latest
+
+21) cd k8s
+
+22) helm install learning-service . -n ora -f values.yaml
+
+23) cd ..\..\scheduling\
+
+24) docker run --rm `
+    -v "${PWD}/migrations/changelog:/liquibase/changelog" `
+    liquibase/liquibase:4.31.1-alpine `
+    "--search-path=/liquibase/changelog" `
+    "--changelog-file=db.changelog-master.xml" `
+    "--url=jdbc:postgresql://host.docker.internal:5433/scheduling" `
+    "--username=scheduling" `
+    "--password=password" `
+    update
+
+25) docker build -t ora-scheduling:latest .
+
+26) minikube image load ora-scheduling:latest
+
+27) cd k8s
+
+28) helm install scheduling-service . -n ora -f values.yaml
+
+29) cd ..\..\payment\
+
+30) docker run --rm `
+    -v "${PWD}/migrations/changelog:/liquibase/changelog" `
+    liquibase/liquibase:4.31.1-alpine `
+    "--search-path=/liquibase/changelog" `
+    "--changelog-file=db.changelog-master.xml" `
+    "--url=jdbc:postgresql://host.docker.internal:5433/payments" `
+    "--username=payments" `
+    "--password=password" `
+    update
+
+31) docker build -t ora-payment:latest .
+
+32) minikube image load ora-payment:latest
+
+33) cd k8s
+
+34) helm install payment-service . -n ora -f values.yaml
+
+35) cd ..\..\..\frontend\web\
+
+36) docker build -t ora-web:latest .
+
+37) minikube image load ora-web:latest
+
+38) cd k8s 
+
+39) helm install web-service . -n ora -f values.yaml
+
+40) add CoreDNS mapping for Keycloak between kubernetes and prometheus : 
+kubectl -n kube-system edit configmap coredns
+rewrite name exact keycloak.127.0.0.1.nip.io platform-ingress-nginx-controller.ora.svc.cluster.local
+kubectl -n kube-system rollout restart deployment coredns
