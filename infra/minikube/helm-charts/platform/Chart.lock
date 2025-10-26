@@ -1,0 +1,30 @@
+dependencies:
+- name: postgresql
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.7.27
+- name: keycloak
+  repository: https://charts.bitnami.com/bitnami
+  version: 25.2.0
+- name: rabbitmq
+  repository: https://charts.bitnami.com/bitnami
+  version: 16.0.14
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.35.1
+- name: tempo
+  repository: https://grafana.github.io/helm-charts
+  version: 1.23.2
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 9.3.1
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 76.2.0
+- name: opentelemetry-collector
+  repository: https://open-telemetry.github.io/opentelemetry-helm-charts
+  version: 0.130.1
+- name: ingress-nginx
+  repository: https://kubernetes.github.io/ingress-nginx
+  version: 4.13.0
+digest: sha256:f7d043c59d2d328335ae49d0f974ca8f7bacff100a2247fad16ea742652774ed
+generated: "2025-10-04T14:09:33.2751362+02:00"

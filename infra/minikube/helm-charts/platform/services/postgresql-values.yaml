@@ -1,0 +1,87 @@
+postgresql:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/postgresql
+    tag: 17.6.0
+
+  fullnameOverride: "postgres"
+
+  auth:
+    enablePostgresUser: true
+    existingSecret: "postgres-auth"
+    secretKeys:
+      adminPasswordKey: "admin-password"
+
+  primary:
+    podSecurityContext:
+      enabled: true
+      fsGroupChangePolicy: Always
+      sysctls: []
+      supplementalGroups: []
+      fsGroup: 1001
+
+    containerSecurityContext:
+      enabled: true
+      seLinuxOptions: {}
+      runAsUser: 1001
+      runAsGroup: 1001
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+      seccompProfile:
+        type: "RuntimeDefault"
+
+    resources:
+      requests:
+        cpu: 150m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    service:
+      port: 5432
+      type: ClusterIP
+      annotations:
+        service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+
+    persistence:
+      enabled: true
+      size: 3Gi
+
+    livenessProbe:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+    readinessProbe:
+      enabled: true
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 6
+
+    initdb:
+      scriptsSecret: "postgres-init-script"
+
+  metrics:
+    enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/postgres-exporter
+      tag: 0.17.1-debian-12-r16
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      additionalLabels:
+        release: prometheus
+    resources:
+      requests:
+        cpu: 25m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi

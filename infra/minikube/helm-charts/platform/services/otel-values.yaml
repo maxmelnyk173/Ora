@@ -1,0 +1,139 @@
+opentelemetry-collector:
+  fullnameOverride: "otel-collector"
+  mode: deployment
+
+  image:
+    repository: otel/opentelemetry-collector-contrib
+    tag: "0.130.1"
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+  ports:
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      hostPort: 4317
+      protocol: TCP
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      protocol: TCP
+    metrics:
+      enabled: true
+      containerPort: 8889
+      servicePort: 8889
+      protocol: TCP
+    health-check:
+      enabled: true
+      containerPort: 13133
+      servicePort: 13133
+      protocol: TCP
+
+  service:
+    type: ClusterIP
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+
+  livenessProbe:
+    httpGet:
+      path: /
+      port: 13133
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 5
+  readinessProbe:
+    httpGet:
+      path: /
+      port: 13133
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+
+  serviceMonitor:
+    enabled: true
+    extraLabels:
+      release: prometheus
+
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+            max_recv_msg_size_mib: 4
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+        send_batch_max_size: 2048
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 1800
+        spike_limit_mib: 400
+      resource:
+        attributes:
+          - key: environment
+            value: dev
+            action: upsert
+          - key: cluster
+            value: minikube
+            action: upsert
+      probabilistic_sampler:
+        sampling_percentage: 100
+
+    exporters:
+      prometheus:
+        endpoint: "0.0.0.0:8889"
+        namespace: platform
+        const_labels:
+          environment: dev
+      loki:
+        endpoint: "http://loki:3100/loki/api/v1/push"
+        headers:
+          "X-Scope-OrgID": "platform"
+      "otlp/tempo":
+        endpoint: "tempo:4317"
+        tls:
+          insecure: true
+        retry_on_failure:
+          enabled: true
+          initial_interval: 5s
+          max_interval: 30s
+          max_elapsed_time: 120s
+
+    extensions:
+      health_check:
+        endpoint: 0.0.0.0:13133
+      pprof:
+        endpoint: 0.0.0.0:1777
+      zpages:
+        endpoint: 0.0.0.0:55679
+
+    service:
+      extensions: [health_check, pprof, zpages]
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [prometheus]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, batch]
+          exporters: [loki]
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, resource, probabilistic_sampler, batch]
+          exporters: [otlp/tempo]

@@ -1,0 +1,286 @@
+keycloak:
+  image:
+    registry: docker.io
+    repository: bitnamilegacy/keycloak
+    tag: 26.3.3
+
+  fullnameOverride: "keycloak"
+
+  auth:
+    adminUser: "admin"
+    existingSecret: "keycloak-auth"
+    passwordSecretKey: "admin-password"
+
+  postgresql:
+    enabled: false
+  externalDatabase:
+    host: "postgres"
+    port: 5432
+    database: "keycloak"
+    existingSecret: "keycloak-db-secret"
+    existingSecretUserKey: "username"
+    existingSecretPasswordKey: "password"
+
+  production: false
+
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 750m
+      memory: 1Gi
+
+  podSecurityContext:
+    enabled: true
+    fsGroupChangePolicy: Always
+    sysctls: []
+    supplementalGroups: []
+    fsGroup: 1001
+
+  containerSecurityContext:
+    enabled: true
+    seLinuxOptions: {}
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: "RuntimeDefault"
+
+  extraEnvVars:
+    - name: KC_PROXY_HEADERS
+      value: xforwarded
+    - name: KC_HEALTH_ENABLED
+      value: "true"
+    - name: KC_METRICS_ENABLED
+      value: "true"
+    - name: KC_LOG_LEVEL
+      value: INFO
+    - name: KC_DB_POOL_INITIAL_SIZE
+      value: "5"
+    - name: KC_DB_POOL_MIN_SIZE
+      value: "5"
+    - name: KC_DB_POOL_MAX_SIZE
+      value: "20"
+
+  livenessProbe:
+    enabled: true
+    initialDelaySeconds: 300
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    enabled: true
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+
+  service:
+    type: ClusterIP
+    ports:
+      http: 8080
+      management: 9000
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      additionalLabels:
+        release: prometheus
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: keycloak.127.0.0.1.nip.io
+    path: /
+    pathType: Prefix
+    servicePort: 8080
+    tls: true
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+
+  keycloakConfigCli:
+    enabled: true
+    image:
+      registry: docker.io
+      repository: bitnamilegacy/keycloak-config-cli
+      tag: 6.4.0-debian-12-r11
+    availabilityCheck:
+      enabled: true
+      timeout: "600s"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    configuration:
+      realm-config.json: |-
+        {
+          "realm": "ora",
+          "enabled": true,
+          "displayName": "ora",
+          "requiredActions": [
+            {
+              "alias": "CONFIGURE_TOTP",
+              "name": "Configure OTP",
+              "providerId": "CONFIGURE_TOTP",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 10,
+              "config": {}
+            },
+            {
+              "alias": "TERMS_AND_CONDITIONS",
+              "name": "Terms and Conditions",
+              "providerId": "TERMS_AND_CONDITIONS",
+              "enabled": false,
+              "defaultAction": false,
+              "priority": 20,
+              "config": {}
+            },
+            {
+              "alias": "UPDATE_PASSWORD",
+              "name": "Update Password",
+              "providerId": "UPDATE_PASSWORD",
+              "enabled": false,
+              "defaultAction": false,
+              "priority": 30,
+              "config": {}
+            },
+            {
+              "alias": "UPDATE_PROFILE",
+              "name": "Update Profile",
+              "providerId": "UPDATE_PROFILE",
+              "enabled": false,
+              "defaultAction": false,
+              "priority": 40,
+              "config": {}
+            },
+            {
+              "alias": "VERIFY_EMAIL",
+              "name": "Verify Email",
+              "providerId": "VERIFY_EMAIL",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 50,
+              "config": {}
+            },
+            {
+              "alias": "delete_account",
+              "name": "Delete Account",
+              "providerId": "delete_account",
+              "enabled": false,
+              "defaultAction": false,
+              "priority": 60,
+              "config": {}
+            },
+            {
+              "alias": "webauthn-register",
+              "name": "Webauthn Register",
+              "providerId": "webauthn-register",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 70,
+              "config": {}
+            },
+            {
+              "alias": "webauthn-register-passwordless",
+              "name": "Webauthn Register Passwordless",
+              "providerId": "webauthn-register-passwordless",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 80,
+              "config": {}
+            },
+            {
+              "alias": "VERIFY_PROFILE",
+              "name": "Verify Profile",
+              "providerId": "VERIFY_PROFILE",
+              "enabled": false,
+              "defaultAction": false,
+              "priority": 90,
+              "config": {}
+            },
+            {
+              "alias": "delete_credential",
+              "name": "Delete Credential",
+              "providerId": "delete_credential",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 100,
+              "config": {}
+            },
+            {
+              "alias": "update_user_locale",
+              "name": "Update User Locale",
+              "providerId": "update_user_locale",
+              "enabled": true,
+              "defaultAction": false,
+              "priority": 1000,
+              "config": {}
+            }
+          ],
+          "roles": {
+            "realm": [
+              { "name": "ROLE_USER" },
+              { "name": "ROLE_EDUCATOR" },
+              { "name": "ROLE_ADMIN" }
+            ]
+          },
+          "clients": [
+            {
+              "clientId": "api-cluster",
+              "enabled": true,
+              "protocol": "openid-connect",
+              "publicClient": false,
+              "standardFlowEnabled": false,
+              "directAccessGrantsEnabled": false,
+              "serviceAccountsEnabled": false,
+              "redirectUris": [],
+              "webOrigins": []
+            },
+            {
+              "clientId": "frontend-app",
+              "enabled": true,
+              "protocol": "openid-connect",
+              "publicClient": true,
+              "standardFlowEnabled": true,
+              "directAccessGrantsEnabled": false, 
+              "redirectUris": [
+                "http://ora.127.0.0.1.nip.io/*",
+                "https://ora.127.0.0.1.nip.io/*"
+              ],
+              "webOrigins": [
+                "http://ora.127.0.0.1.nip.io",
+                "https://ora.127.0.0.1.nip.io"
+              ],
+              "protocolMappers": [
+                {
+                  "name": "audience-mapper",
+                  "protocol": "openid-connect",
+                  "protocolMapper": "oidc-audience-mapper",
+                  "consentRequired": false,
+                  "config": {
+                    "included.client.audience": "api-cluster",
+                    "access.token.claim": "true",
+                    "id.token.claim": "false"
+                  }
+                }
+              ]
+            }
+          ]
+        }

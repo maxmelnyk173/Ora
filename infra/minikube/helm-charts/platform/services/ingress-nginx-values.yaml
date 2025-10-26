@@ -1,0 +1,102 @@
+ingress-nginx:
+  controller:
+    kind: Deployment
+    replicaCount: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
+
+    extraArgs:
+      default-ssl-certificate: "ora/nginx-default-cert"
+
+    config:
+      client-header-buffer-size: "16k"
+      large-client-header-buffers: "4 16k"
+      client-max-body-size: "50m"
+
+      proxy-connect-timeout: "5"
+      proxy-read-timeout: "60"
+      proxy-send-timeout: "60"
+
+      enable-gzip: "true"
+      gzip-level: "6"
+      gzip-types: "text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json"
+
+      add-headers: "ora/ingress-nginx-custom-headers" 
+
+      ssl-protocols: "TLSv1.2 TLSv1.3"
+      ssl-prefer-server-ciphers: "true"
+
+      log-format-escape-json: "true"
+      log-format-upstream: '{"time": "$time_iso8601", "remote_addr": "$proxy_protocol_addr", "x_forwarded_for": "$proxy_add_x_forwarded_for", "request_id": "$req_id", "remote_user": "$remote_user", "bytes_sent": $bytes_sent, "request_time": $request_time, "status": $status, "vhost": "$host", "request_proto": "$server_protocol", "path": "$uri", "request_query": "$args", "request_length": $request_length, "duration": $request_time, "method": "$request_method", "http_referrer": "$http_referer", "http_user_agent": "$http_user_agent"}'
+
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 80
+      targetMemoryUtilizationPercentage: 80
+
+    admissionWebhooks:
+      enabled: false
+
+    service:
+      type: LoadBalancer
+      ports:
+        http: 80
+        https: 443
+      targetPorts:
+        http: http
+        https: https
+      annotations:
+        service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: "true"
+
+    livenessProbe:
+      failureThreshold: 5
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+    readinessProbe:
+      failureThreshold: 3
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      successThreshold: 1
+      timeoutSeconds: 1
+
+    metrics:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        additionalLabels:
+          release: prometheus
+      prometheusRule:
+        enabled: false
+
+    lifecycle:
+      preStop:
+        exec:
+          command:
+            - /wait-shutdown
+
+    priorityClassName: ""
+
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+
+    updateStrategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 1
+        maxSurge: 25%
+
+    minReadySeconds: 0
+
+    defaultBackend:
+      enabled: false

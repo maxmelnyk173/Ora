@@ -1,0 +1,48 @@
+tempo:
+  fullnameOverride: "tempo"
+
+  replicas: 1
+
+  securityContext:
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    runAsNonRoot: true
+
+  tempo:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    server:
+      http_listen_port: 3200
+
+    storage:
+      trace:
+        backend: local
+        local:
+          path: /var/tempo/traces
+        wal:
+          path: /var/tempo/wal
+
+  persistence:
+    enabled: true
+    size: 1Gi
+    accessModes: ["ReadWriteOnce"]
+
+  service:
+    type: ClusterIP
+    port: 3200
+
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    additionalLabels:
+      release: prometheus
+
+  multitenancyEnabled: false
+  reportingEnabled: false

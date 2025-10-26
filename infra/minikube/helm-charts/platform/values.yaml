@@ -1,0 +1,13 @@
+global:
+  storageClass: standard
+  environment: dev
+  services:
+    keycloak:
+      realm: ora
+      audience: api-cluster
+      adminClientId: admin-cli
+      authClientId: frontend-app
+    rabbitmq:
+      exchange: ora-exchange
+      dlqExchange: ora-dlq-exchange
+      messageTTL: 30000

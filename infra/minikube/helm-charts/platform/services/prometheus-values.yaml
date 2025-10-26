@@ -1,0 +1,95 @@
+kube-prometheus-stack:
+  fullnameOverride: "kps"
+
+  grafana:
+    enabled: false
+  alertmanager:
+    enabled: false
+  kubeStateMetrics:
+    enabled: false
+  nodeExporter:
+    enabled: false
+
+  prometheusOperator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 150m
+        memory: 128Mi
+    securityContext:
+      fsGroup: 65534
+      runAsGroup: 65534
+      runAsUser: 65534
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
+
+  prometheus:
+    fullnameOverride: "prometheus"
+
+    service:
+      type: ClusterIP
+      port: 9090
+
+    prometheusSpec:
+      replicas: 1
+
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+
+      securityContext:
+        runAsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+
+      serviceMonitorSelector: {}
+      podMonitorSelector: {}
+      ruleSelector: {}
+      podMonitorSelectorNilUsesHelmValues: false
+      serviceMonitorSelectorNilUsesHelmValues: false
+      ruleSelectorNilUsesHelmValues: false
+      retention: "1d"
+      retentionSize: "1GB"
+      walCompression: true
+      scrapeInterval: 30s
+      scrapeTimeout: 10s
+      evaluationInterval: 30s
+      additionalScrapeConfigs: []
+      remoteWrite: []
+      remoteRead: []
+
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 1Gi
+
+      query:
+        maxConcurrency: 20
+        timeout: 2m
+        maxSamples: 50000000
+
+      externalLabels:
+        cluster: minikube
+        environment: dev
+
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      hosts: ["prometheus.127.0.0.1.nip.io"]
+      paths:
+        - /
+      pathType: Prefix
