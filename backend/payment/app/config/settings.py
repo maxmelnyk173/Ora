@@ -27,6 +27,9 @@ class AppSettings:
     port: str = get_env_var(name="PAYMENT_PORT", default="8086")
     host: str = get_env_var(name="PAYMENT_HOST", default="0.0.0.0")
     debug: bool = get_env_var(name="PAYMENT_DEBUG", default=False)
+
+
+class CORSSettings:
     allow_credentials: bool = get_env_var(name="ALLOWED_CREDENTIALS", default=True)
     allow_origins: list[str] = get_env_var("ALLOWED_ORIGINS", default="").split(",")
     allow_methods: list[str] = get_env_var("ALLOWED_METHODS", default="").split(",")
@@ -34,7 +37,11 @@ class AppSettings:
 
 
 class DatabaseSettings:
-    url: str = get_env_var(name="PAYMENT_DB_URL", default="")
+    host: str = get_env_var(name="POSTGRES_HOST", default="localhost")
+    port: int = get_env_var(name="POSTGRES_PORT", default=5432)
+    name: str = get_env_var(name="PAYMENT_DB_NAME", default="")
+    user: str = get_env_var(name="PAYMENT_DB_USER", default="")
+    password: str = get_env_var(name="PAYMENT_DB_PASS", default="")
     pool_size: int = get_env_var(name="PAYMENT_DB_POOL_SIZE", default=10)
     max_overflow: int = get_env_var(name="PAYMENT_DB_MAX_OVERFLOW", default=20)
     timeout: int = get_env_var(name="PAYMENT_DB_TIMEOUT", default=30)
@@ -50,12 +57,6 @@ class KeycloakSettings:
 class LogSettings:
     service_name: str = get_env_var(name="PAYMENT_NAME", default="payment-service")
     level: str = get_env_var(name="PAYMENT_LOG_LEVEL", default="INFO")
-    file_dir: str = get_env_var(name="PAYMENT_LOG_FILE_DIR", default="logs")
-    file_path: str = get_env_var(name="PAYMENT_LOG_FILE_PATH", default="logs.txt")
-    file_rotation: int = get_env_var(
-        name="PAYMENT_LOG_FILE_ROTATION", default=10 * 1024 * 1024
-    )
-    backup_count: int = get_env_var("PAYMENT_LOG_BACKUP_COUNT", default=5)
 
 
 class TelemetrySettings:
@@ -98,6 +99,7 @@ class ExternalServiceSettings:
 
 class Settings:
     app: AppSettings = AppSettings()
+    cors: CORSSettings = CORSSettings()
     db: DatabaseSettings = DatabaseSettings()
     keycloak: KeycloakSettings = KeycloakSettings()
     log: LogSettings = LogSettings()

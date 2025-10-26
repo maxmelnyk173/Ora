@@ -21,14 +21,14 @@ class Base(AsyncAttrs, DeclarativeBase):
 settings: Settings = get_settings()
 
 engine: AsyncEngine = create_async_engine(
-    url=settings.db.url,
+    url=f"postgresql+asyncpg://{settings.db.user}:{settings.db.password}@{settings.db.host}:{settings.db.port}/{settings.db.name}",
     echo=settings.db.debug,
     pool_size=settings.db.pool_size,
     max_overflow=settings.db.max_overflow,
     connect_args={"timeout": settings.db.timeout},
 )
 
-SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+SessionLocal: async_sessionmaker[AsyncSession] = async_sessionmaker(bind=engine, expire_on_commit=False)
 
 
 async def get_db_session() -> AsyncIterator[AsyncSession]:
