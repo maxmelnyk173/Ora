@@ -28,7 +28,7 @@ public class TelemetryConfig {
     private final TelemetryProperties properties;
 
     @Bean
-    public OpenTelemetry openTelemetry() {
+    OpenTelemetry openTelemetry() {
         if (!properties.getEnableLogs() && !properties.getEnableMetrics() && !properties.getEnableTraces()) {
             return OpenTelemetry.noop();
         }
@@ -71,12 +71,12 @@ public class TelemetryConfig {
     }
 
     @Bean
-    public Tracer tracer(OpenTelemetry openTelemetry) {
+    Tracer tracer(OpenTelemetry openTelemetry) {
         return openTelemetry.getTracer(properties.getServiceName());
     }
 
     @Bean
-    public Meter meter(OpenTelemetry openTelemetry) {
+    Meter meter(OpenTelemetry openTelemetry) {
         return openTelemetry.getMeter(properties.getServiceName());
     }
 }

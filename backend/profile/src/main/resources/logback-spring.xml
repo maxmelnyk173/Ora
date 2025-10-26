@@ -8,20 +8,6 @@
         </filter>
     </appender>
 
-    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${PROFILE_LOG_FILE_PATH:-logs/log.txt}</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-            <fileNamePattern>${PROFILE_LOG_FILE_PATH:-logs/log-%d{yyyy-MM-dd}.txt}</fileNamePattern>
-            <maxHistory>${PROFILE_LOG_FILE_HISTORY:-7}</maxHistory>
-            <totalSizeCap>${PROFILE_LOG_FILE_SIZE:-500MB}</totalSizeCap>
-            <cleanHistoryOnStart>true</cleanHistoryOnStart>
-        </rollingPolicy>
-        <encoder class="com.example.profile.middleware.logging.LogJsonEncoder" />
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>${PROFILE_LOG_LEVEL:-INFO}</level>
-        </filter>
-    </appender>
-
     <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
         <captureExperimentalAttributes>false</captureExperimentalAttributes>
         <captureCodeAttributes>true</captureCodeAttributes>
@@ -33,7 +19,6 @@
 
     <root level="INFO">
         <appender-ref ref="CONSOLE" />
-        <appender-ref ref="FILE" />
         <appender-ref ref="OTEL" />
     </root>
 
@@ -41,7 +26,6 @@
         <appender-ref ref="CONSOLE" />
     </logger>
     <logger name="org.springframework" level="WARN" additivity="false">
-        <appender-ref ref="FILE" />
         <appender-ref ref="OTEL" />
     </logger>
 
@@ -49,7 +33,6 @@
         <appender-ref ref="CONSOLE" />
     </logger>
     <logger name="org.hibernate" level="WARN" additivity="false">
-        <appender-ref ref="FILE" />
         <appender-ref ref="OTEL" />
     </logger>
 
@@ -57,7 +40,6 @@
         <appender-ref ref="CONSOLE" />
     </logger>
     <logger name="org.apache" level="WARN" additivity="false">
-        <appender-ref ref="FILE" />
         <appender-ref ref="OTEL" />
     </logger>
 
@@ -65,7 +47,6 @@
         <appender-ref ref="CONSOLE" />
     </logger>
     <logger name="com.zaxxer" level="WARN" additivity="false">
-        <appender-ref ref="FILE" />
         <appender-ref ref="OTEL" />
     </logger>
 </configuration>
