@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	Server    ServerConfig
+	CORS      CORSConfig
 	Postgres  PostgresConfig
 	Keycloak  KeycloakConfig
 	Log       LogConfig
@@ -17,8 +18,11 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	Port             string
-	Name             string
+	Port string
+	Name string
+}
+
+type CORSConfig struct {
 	AllowCredentials bool
 	AllowOrigin      []string
 	AllowHeaders     []string
@@ -44,11 +48,6 @@ type LogConfig struct {
 	EnableCentralStorage bool
 	ServiceName          string
 	Level                string
-	FilePath             string
-	MaxSize              int
-	MaxAge               int
-	MaxBackups           int
-	Compress             bool
 }
 
 type TelemetryConfig struct {
@@ -117,8 +116,11 @@ func GetEnvWithDefault[T any](key string, defaultValue T) T {
 
 func LoadConfig() Config {
 	serverConfig := ServerConfig{
-		Port:             GetEnvWithDefault("SCHEDULING_PORT", "8084"),
-		Name:             GetEnvWithDefault("SCHEDULING_NAME", "scheduling-service"),
+		Port: GetEnvWithDefault("SCHEDULING_PORT", "8084"),
+		Name: GetEnvWithDefault("SCHEDULING_NAME", "scheduling-service"),
+	}
+
+	corsConfig := CORSConfig{
 		AllowCredentials: GetEnvWithDefault("ALLOWED_CREDENTIALS", true),
 		AllowOrigin:      strings.Split(GetEnvWithDefault("ALLOWED_ORIGINS", ""), ","),
 		AllowHeaders:     strings.Split(GetEnvWithDefault("ALLOWED_HEADERS", ""), ","),
@@ -127,7 +129,7 @@ func LoadConfig() Config {
 
 	postgresConfig := PostgresConfig{
 		Host:     GetEnvWithDefault("POSTGRES_HOST", "localhost"),
-		Port:     GetEnvWithDefault("POSTGRES_PORT", "5433"),
+		Port:     GetEnvWithDefault("POSTGRES_PORT", "5432"),
 		PgDriver: GetEnvWithDefault("POSTGRES_DRIVER", ""),
 		DbName:   GetEnvWithDefault("SCHEDULING_DB_NAME", "scheduling"),
 		User:     GetEnvWithDefault("SCHEDULING_DB_USER", "postgres"),
@@ -144,11 +146,6 @@ func LoadConfig() Config {
 		EnableCentralStorage: GetEnvWithDefault("LOG_ENABLE_CENTRAL_STORAGE", false),
 		ServiceName:          GetEnvWithDefault("SCHEDULING_NAME", "scheduling-service"),
 		Level:                GetEnvWithDefault("SCHEDULING_LOG_LEVEL", "info"),
-		FilePath:             GetEnvWithDefault("SCHEDULING_LOG_FILE_PATH", "../../logs/log.txt"),
-		MaxSize:              GetEnvWithDefault("SCHEDULING_LOG_MAX_SIZE", 10),
-		MaxAge:               GetEnvWithDefault("SCHEDULING_LOG_MAX_AGE", 30),
-		MaxBackups:           GetEnvWithDefault("SCHEDULING_LOG_MAX_BACKUPS", 5),
-		Compress:             GetEnvWithDefault("SCHEDULING_LOG_COMPRESS", true),
 	}
 
 	telemetryConfig := TelemetryConfig{
@@ -180,5 +177,5 @@ func LoadConfig() Config {
 		LearningServiceUrl: GetEnvWithDefault("LEARNING_URL", ""),
 	}
 
-	return Config{serverConfig, postgresConfig, keycloakConfig, logConfig, telemetryConfig, rabbitMqConfig, externalServiceConfig}
+	return Config{serverConfig, corsConfig, postgresConfig, keycloakConfig, logConfig, telemetryConfig, rabbitMqConfig, externalServiceConfig}
 }

@@ -153,10 +153,10 @@ func main() {
 	router := chi.NewRouter()
 
 	corsMiddleware := cors.New(cors.Options{
-		AllowedOrigins:   cfg.Server.AllowOrigin,
-		AllowedMethods:   cfg.Server.AllowMethods,
-		AllowedHeaders:   cfg.Server.AllowHeaders,
-		AllowCredentials: cfg.Server.AllowCredentials,
+		AllowedOrigins:   cfg.CORS.AllowOrigin,
+		AllowedMethods:   cfg.CORS.AllowMethods,
+		AllowedHeaders:   cfg.CORS.AllowHeaders,
+		AllowCredentials: cfg.CORS.AllowCredentials,
 	})
 
 	router.Use(corsMiddleware.Handler)
@@ -167,10 +167,25 @@ func main() {
 		otelhttp.WithMeterProvider(otel.GetMeterProvider()),
 	))
 	router.Use(middleware.LoggingMiddleware(tel.Logger))
-	router.Use(middleware.AuthMiddleware(validator, tel.Logger, []string{"/swagger"}))
+	router.Use(middleware.AuthMiddleware(validator, tel.Logger, []string{"/swagger", "/health"}))
 
 	// --- Mount Routes ---
 	router.Get("/swagger/*", httpSwagger.WrapHandler)
+
+	router.Get("/health/liveness", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ok"))
+	})
+
+	router.Get("/health/readiness", func(w http.ResponseWriter, r *http.Request) {
+		if db.Ping() != nil {
+			http.Error(w, "db not ready", http.StatusServiceUnavailable)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("ready"))
+	})
+
 	router.Mount("/api/v1/schedules", schedule.InitializeScheduleHTTPHandler(schedulerService))
 	router.Mount("/api/v1/bookings", booking.InitializeBookingHTTPHandler(bookingService))
 
