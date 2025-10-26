@@ -1,12 +1,22 @@
 server:
-  port: "${PROFILE_PORT}"
-  name: "${PROFILE_NAME:-profile-service}"
+  port: ${PROFILE_PORT}
+  name: ${PROFILE_NAME:-profile-service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
 
 spring:
   datasource:
-    url: "${PROFILE_DB_URL}"
-    username: "${PROFILE_DB_USER}"
-    password: "${PROFILE_DB_PASS}"
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${PROFILE_DB_NAME}
+    username: ${PROFILE_DB_USER}
+    password: ${PROFILE_DB_PASS}
     driver-class-name: org.postgresql.Driver
   jpa:
     show-sql: true
@@ -17,14 +27,13 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          jwk-set-uri: "${KEYCLOAK_JWKS_URI}"
-          issuer: "${KEYCLOAK_ISSUER_URI}"
+          issuer-uri: ${KEYCLOAK_ISSUER_URI}
   rabbitmq:
     host: ${RABBITMQ_HOST}
-    port: "${RABBITMQ_PORT}"
-    username: "${RABBITMQ_USER}"
-    password: "${RABBITMQ_PASS}"
-    virtual-host: "${RABBITMQ_VHOST}"
+    port: ${RABBITMQ_PORT}
+    username: ${RABBITMQ_USER}
+    password: ${RABBITMQ_PASS}
+    virtual-host: ${RABBITMQ_VHOST}
     listener:
       simple:
         retry:
@@ -48,8 +57,8 @@ app:
     dlq-exchange: ${RABBITMQ_DLQ_EXCHANGE:dead-letter-exchange}
     message-ttl: ${RABBITMQ_MESSAGE_TTL:30000}
   otel:
-    serviceName: "${PROFILE_NAME:-profile-service}"
-    endpoint: "${OTEL_GRPC_URL:-http://localhost:4317}"
-    enableTraces: "${PROFILE_OTEL_TRACING:true}"
-    enableMetrics: "${PROFILE_OTEL_METRICS:true}"
-    enableLogs: "${PROFILE_OTEL_LOGGING:true}"
+    serviceName: ${PROFILE_NAME:-profile-service}
+    endpoint: ${OTEL_GRPC_URL:-http://localhost:4317}
+    enableTraces: ${PROFILE_OTEL_TRACING:true}
+    enableMetrics: ${PROFILE_OTEL_METRICS:true}
+    enableLogs: ${PROFILE_OTEL_LOGGING:true}
