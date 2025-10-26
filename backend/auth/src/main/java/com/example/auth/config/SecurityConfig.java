@@ -14,8 +14,10 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests( // TODO: temporary allow OpenAPI docs APIs
-                        a -> a.requestMatchers("/api/v1/auth/**", "/v3/api-docs/**", "/swagger-ui/**")
-                                .permitAll().anyRequest().authenticated());
+                        a -> a.requestMatchers("/api/v1/auth/**").permitAll()
+                                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**").permitAll()
+                                .requestMatchers("/actuator/**").permitAll()
+                                .anyRequest().authenticated());
 
         return http.build();
     }
