@@ -1,6 +1,5 @@
 import sys
 import logging
-from pathlib import Path
 from typing import Any, Dict, Callable
 from loguru import logger
 from opentelemetry.sdk.resources import Resource
@@ -10,12 +9,6 @@ from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 
 from app.config.settings import LogSettings
-from app.infrastructure.telemetry.utils import (
-    format_log_message,
-    rotate_logs,
-    write_log,
-    flatten_dict,
-)
 
 LOG_LEVEL_MAP: Dict[int, str] = {
     logging.DEBUG: "DEBUG",
@@ -36,22 +29,19 @@ class InterceptHandler(logging.Handler):
         logger.opt(exception=record.exc_info).log(level_name, record.getMessage())
 
 
-def create_json_sink(
-    log_path: Path,
-    service_name: str,
-    max_bytes: int,
-    backup_count: int,
-) -> Callable[[Any], None]:
-    """Creates a JSON sink function."""
-
-    def json_sink(message: Any) -> None:
-        log_message = format_log_message(
-            record=message.record, service_name=service_name
-        )
-        rotate_logs(log_path=log_path, max_bytes=max_bytes, backup_count=backup_count)
-        write_log(log_path=log_path, log_message=log_message)
-
-    return json_sink
+def flatten_dict(
+    d: Dict[str, Any], parent_key: str = "", sep: str = "."
+) -> Dict[str, Any]:
+    """Flattens nested dictionaries into a dot-separated key structure."""
+    items: Dict[str, Any] = {}
+    for k, v in d.items():
+        new_key: str = f"{parent_key}{sep}{k}" if parent_key else k
+        if isinstance(v, dict):
+            val: Dict[str, Any] = v  # type: ignore
+            items.update(flatten_dict(val, new_key, sep))
+        else:
+            items[new_key.lstrip("extra.")] = v
+    return items
 
 
 def create_otlp_sink(otel_handler: LoggingHandler) -> Callable[[Any], None]:
@@ -96,7 +86,7 @@ def setup_logging(resource: Resource, stg: LogSettings, otel_endpoint: str) -> N
 
     logger.remove()
     logger.add(
-        sys.stdout,
+        sink=sys.stdout,
         colorize=True,
         level="INFO",
         enqueue=True,
@@ -104,21 +94,6 @@ def setup_logging(resource: Resource, stg: LogSettings, otel_endpoint: str) -> N
         catch=True,
         diagnose=True,
     )
-
-    if stg.file_dir and stg.file_path:
-        logs_path: Path = Path(stg.file_dir) / stg.file_path
-        logs_path.parent.mkdir(exist_ok=True)
-        logger.add(
-            sink=create_json_sink(
-                log_path=logs_path,
-                service_name=stg.service_name,
-                max_bytes=stg.file_rotation,
-                backup_count=stg.backup_count,
-            ),
-            level=stg.level,
-            enqueue=True,
-            catch=True,
-        )
 
     if resource:
         otel_logger_provider: LoggerProvider = create_otel_logging_provider(
