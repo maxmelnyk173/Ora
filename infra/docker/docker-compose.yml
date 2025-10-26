@@ -1,3 +1,21 @@
+x-java-truststore-injector: &java-truststore-injector
+  user: root
+  volumes:
+    - ca-trust:/etc/ssl/certs:ro
+  entrypoint:
+    - sh
+    - -c
+    - |
+      set -e
+      # inject mkcert root CA into Java cacerts if not already present
+      keytool -list -cacerts -storepass changeit -alias mkcert-root >/dev/null 2>&1 \
+        || keytool -importcert -noprompt -trustcacerts \
+          -file /etc/ssl/certs/rootCA.crt \
+          -alias mkcert-root \
+          -cacerts -storepass changeit
+      exec "$@"
+    - sh
+
 x-envs:
   origins-common: &origins-common
     ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
@@ -8,8 +26,6 @@ x-envs:
   postgres-common: &postgres-common
     POSTGRES_HOST: ${POSTGRES_HOST}
     POSTGRES_PORT: ${POSTGRES_PORT}
-    POSTGRES_USER: ${POSTGRES_USER}
-    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
   keycloak-common: &keycloak-common
     KEYCLOAK_URL: ${KEYCLOAK_URL}
@@ -70,7 +86,7 @@ services:
       - postgres:/var/lib/postgresql/data
       - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}" ]
       interval: 30s
@@ -90,7 +106,7 @@ services:
     volumes:
       - pgadmin:/var/lib/pgadmin
     networks:
-      - microservices-net
+      - ora-net
     depends_on:
       - postgres
     healthcheck:
@@ -122,7 +138,7 @@ services:
     depends_on:
       - postgres
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9000/keycloak/health/ready || exit 1" ]
       interval: 30s
@@ -139,7 +155,7 @@ services:
     volumes:
       - rabbit_mq:/var/lib/rabbitmq/mnesia
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "rabbitmq-diagnostics -q status || exit 1" ]
       interval: 30s
@@ -158,7 +174,7 @@ services:
       - tempo
       - loki
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:13133/health || exit 1" ]
       interval: 30s
@@ -178,7 +194,7 @@ services:
       - ./configs/prometheus.yaml:/etc/prometheus.yaml
       - prometheus-data:/var/lib/prometheus
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:9090/-/healthy || exit 1" ]
       interval: 30s
@@ -194,7 +210,7 @@ services:
       - loki-data:/var/lib/loki
       - ./configs/loki.yaml:/etc/loki-config.yaml:ro
     networks:
-      - microservices-net
+      - ora-net
     user: root
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:3100/ready || exit 1" ]
@@ -211,7 +227,7 @@ services:
       - tempo-data:/var/lib/tempo
       - ./configs/tempo.yaml:/etc/tempo.yaml:ro
     networks:
-      - microservices-net
+      - ora-net
     user: root
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:3200/ready || exit 1" ]
@@ -236,7 +252,7 @@ services:
       - loki
       - tempo
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1" ]
       interval: 30s
@@ -250,7 +266,7 @@ services:
       context: ./nginx
       dockerfile: Dockerfile
     volumes:
-      - ./nginx/certs:/etc/nginx/certs:ro
+      - ../../certs:/etc/nginx/certs:ro
     ports:
       - "80:80"
       - "443:443"
@@ -266,49 +282,81 @@ services:
       - payment
     environment:
       - SERVER_NAME=${NGINX_SERVER_NAME:-localhost}
-      - SSL_CERTIFICATE=${NGINX_SSL_CERTIFICATE:-/etc/nginx/certs/default.crt}
-      - SSL_CERTIFICATE_KEY=${NGINX_SSL_CERTIFICATE_KEY:-/etc/nginx/certs/default.key}
+      - SSL_CERTIFICATE=${NGINX_SSL_CERTIFICATE:-/etc/nginx/certs/cert.pem}
+      - SSL_CERTIFICATE_KEY=${NGINX_SSL_CERTIFICATE_KEY:-/etc/nginx/certs/cert-key.pem}
     networks:
-      - microservices-net
+      - ora-net
     healthcheck:
       test: [ "CMD-SHELL", "curl -f http://localhost || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
+  
+  ca-injector:
+    container_name: ca-injector
+    image: debian:bullseye-slim
+    volumes:
+      - ${MKCERT_CA_PATH:-/dev/null}:/usr/local/share/ca-certificates/rootCA.crt:ro
+      - ca-trust:/etc/ssl/certs
+    command: >
+      sh -c "apt-get update &&
+        apt-get install -y ca-certificates &&
+        cp /usr/local/share/ca-certificates/rootCA.crt /etc/ssl/certs/rootCA.crt &&
+        update-ca-certificates &&
+        tail -f /dev/null"
+    networks:
+      - ora-net
 
   auth:
+    <<: *java-truststore-injector
+    image: ora-auth:latest
     container_name: auth
     restart: unless-stopped
-    build: ./backend/auth
+    build:
+      context: ../../backend/auth
+      dockerfile: Dockerfile
+    command: [ "java", "-jar", "auth.jar" ]
     environment:
       <<: [ *origins-common, *rabbitmq-common, *keycloak-common ]
       AUTH_PORT: ${AUTH_PORT}
       AUTH_NAME: ${AUTH_NAME}
     depends_on:
+      ca-injector:
+        condition: service_started
       keycloak:
         condition: service_started
       rabbitmq:
         condition: service_healthy
     networks:
-      - microservices-net
+      - ora-net
+    extra_hosts:
+      - "${NGINX_SERVER_NAME:-ora.127.0.0.1.nip.io}:host-gateway"
 
   profile:
+    <<: *java-truststore-injector
+    image: ora-profile:latest
     container_name: profile
     restart: unless-stopped
-    build: ./backend/profile
+    build:
+      context: ../../backend/profile
+      dockerfile: Dockerfile
+    command: [ "java", "-jar", "profile.jar" ]
     environment:
       <<: [ 
         *origins-common,
+        *postgres-common,
         *rabbitmq-common,
         *keycloak-common,
         *telemetry-common
       ]
       PROFILE_PORT: ${PROFILE_PORT}
       PROFILE_NAME: ${PROFILE_NAME}
-      PROFILE_DB_URL: ${PROFILE_DB_URL}
+      PROFILE_DB_NAME: ${PROFILE_DB_NAME}
       PROFILE_DB_USER: ${PROFILE_DB_USER}
       PROFILE_DB_PASS: ${PROFILE_DB_PASS}
     depends_on:
+      ca-injector:
+        condition: service_started
       keycloak:
         condition: service_started
       rabbitmq:
@@ -316,12 +364,17 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - microservices-net
+      - ora-net
+    extra_hosts:
+      - "${NGINX_SERVER_NAME:-ora.127.0.0.1.nip.io}:host-gateway"
 
   learning:
+    image: ora-learning:latest
     container_name: learning
     restart: unless-stopped
-    build: ./backend/learning
+    build:
+      context: ../../backend/learning
+      dockerfile: Dockerfile
     environment:
       <<: [ 
         *origins-common
@@ -329,11 +382,14 @@ services:
       LEARNING_URL: ${LEARNING_URL}
       LEARNING_NAME: ${LEARNING_NAME}
       ASPNETCORE_URLS: ${ASPNETCORE_URLS}
-      ConnectionStrings__DefaultConnection: ${LEARNING_DB_URL}
+      DbOptions__Host: ${POSTGRES_HOST}
+      DbOptions__Port: ${POSTGRES_PORT}
+      DbOptions__Name: ${LEARNING_DB_NAME}
+      DbOptions__Username: ${LEARNING_DB_USER}
+      DbOptions__Password: ${LEARNING_DB_PASS}
       KeycloakOptions__Authority: ${KEYCLOAK_ISSUER_URI}
       KeycloakOptions__Audience: ${KEYCLOAK_AUDIENCE}
       KeycloakOptions__RoleAddress: ${KEYCLOAK_ROLE_ADDRESS}
-      KeycloakOptions__MetadataAddress: ${KEYCLOAK_METADATA_ADDRESS}
       TelemetryOptions__OpenTelemetryEndpoint: ${OTEL_GRPC_URL}
       RabbitMqOptions__HostName: ${RABBITMQ_HOST}
       RabbitMqOptions__VirtualHost: ${RABBITMQ_VHOST}
@@ -344,22 +400,32 @@ services:
       RabbitMqOptions__DeadLetterExchange: ${RABBITMQ_DLQ_EXCHANGE}
       RabbitMqOptions__MessageTtl: ${RABBITMQ_MESSAGE_TTL}
     depends_on:
+      ca-injector:
+        condition: service_started
       keycloak:
         condition: service_started
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - ca-trust:/etc/ssl/certs:ro
     networks:
-      - microservices-net
+      - ora-net
+    extra_hosts:
+      - "${NGINX_SERVER_NAME:-ora.127.0.0.1.nip.io}:host-gateway"
 
   scheduling:
+    image: ora-scheduling:latest
     container_name: scheduling
     restart: unless-stopped
-    build: ./backend/scheduling
+    build:
+      context: ../../backend/scheduling
+      dockerfile: Dockerfile
     environment:
       <<: [ 
         *origins-common,
+        *postgres-common,
         *rabbitmq-common,
         *keycloak-common,
         *telemetry-common,
@@ -367,29 +433,37 @@ services:
       ]
       SCHEDULING_PORT: ${SCHEDULING_PORT}
       SCHEDULING_NAME: ${SCHEDULING_NAME}
-      POSTGRES_HOST: ${POSTGRES_HOST}
-      POSTGRES_PORT: ${POSTGRES_PORT}
       POSTGRES_DRIVER: ${POSTGRES_DRIVER}
       SCHEDULING_DB_NAME: ${SCHEDULING_DB_NAME}
       SCHEDULING_DB_USER: ${SCHEDULING_DB_USER}
       SCHEDULING_DB_PASS: ${SCHEDULING_DB_PASS}
     depends_on:
+      ca-injector:
+        condition: service_started
       keycloak:
         condition: service_started
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - ca-trust:/etc/ssl/certs:ro
     networks:
-      - microservices-net
+      - ora-net
+    extra_hosts:
+      - "${NGINX_SERVER_NAME:-ora.127.0.0.1.nip.io}:host-gateway"
 
   payment:
+    image: ora-payment:latest
     container_name: payment
     restart: unless-stopped
-    build: ./backend/payment
+    build:
+      context: ../../backend/payment
+      dockerfile: Dockerfile
     environment:
       <<: [ 
         *origins-common,
+        *postgres-common,
         *rabbitmq-common,
         *keycloak-common,
         *telemetry-common,
@@ -397,21 +471,31 @@ services:
       ]
       PAYMENT_PORT: ${PAYMENT_PORT}
       PAYMENT_NAME: ${PAYMENT_NAME}
-      PAYMENT_DB_URL: ${PAYMENT_DB_URL}
+      PAYMENT_DB_NAME: ${PAYMENT_DB_NAME}
+      PAYMENT_DB_USER: ${PAYMENT_DB_USER}
+      PAYMENT_DB_PASS: ${PAYMENT_DB_PASS}
+      SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
     depends_on:
+      ca-injector:
+        condition: service_started
       keycloak:
         condition: service_started
       rabbitmq:
         condition: service_healthy
       postgres:
         condition: service_healthy
+    volumes:
+      - ca-trust:/etc/ssl/certs:ro
     networks:
-      - microservices-net
+      - ora-net
+    extra_hosts:
+      - "${NGINX_SERVER_NAME:-ora.127.0.0.1.nip.io}:host-gateway"
   
   web:
+    image: ora-web:latest
     container_name: web
     build:
-      context: ./frontend/web
+      context: ../../frontend/web
       dockerfile: Dockerfile
     restart: unless-stopped
     environment:
@@ -425,11 +509,11 @@ services:
       VITE_KEYCLOAK_REALM: ${VITE_KEYCLOAK_REALM}
       VITE_KEYCLOAK_CLIENT_ID: ${VITE_KEYCLOAK_CLIENT_ID}
     networks:
-      - microservices-net
+      - ora-net
 
 networks:
-  microservices-net:
-    name: microservices-net
+  ora-net:
+    name: ora-net
     driver: bridge
 
 volumes:
@@ -447,3 +531,5 @@ volumes:
     name: tempo-data
   loki-data:
     name: loki-data
+  ca-trust: 
+    name: ca-trust

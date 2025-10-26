@@ -1,6 +1,6 @@
 *.env*
-.vscode/
-nginx/certs/
-dev/
-open.ps1
 !.env.example
+.vscode/
+dev/
+*certs*
+**/charts/*.tgz

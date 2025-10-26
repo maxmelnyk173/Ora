@@ -1,22 +1,19 @@
 #!/bin/bash
 set -eo pipefail
 
-# --- Validate Required Environment Variables ---
-required_vars=(
-  POSTGRES_USER 
-  POSTGRES_PASSWORD 
-  KEYCLOAK_DB_USER 
-  KEYCLOAK_DB_PASS 
-  PROFILE_DB_USER 
-  PROFILE_DB_PASS 
-  LEARNING_DB_USER 
-  LEARNING_DB_PASS 
-  SCHEDULING_DB_USER 
-  SCHEDULING_DB_PASS 
-  PAYMENT_DB_USER 
-  PAYMENT_DB_PASS
-)
+# --- Define services that need databases ---
+# (Names must be lowercase)
+services=("keycloak" "profile" "learning" "scheduling" "payment")
 
+# --- Dynamically build required_vars ---
+required_vars=("POSTGRES_USER" "POSTGRES_PASSWORD")
+for service in "${services[@]}"; do
+  upper_service=$(echo "$service" | tr '[:lower:]' '[:upper:]')
+  required_vars+=("${upper_service}_DB_USER")
+  required_vars+=("${upper_service}_DB_PASS")
+done
+
+# --- Validate Required Environment Variables ---
 for var in "${required_vars[@]}"; do
   if [ -z "${!var}" ]; then
     echo "Error: variable '$var' must not be null." >&2
@@ -24,14 +21,23 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-# --- Mapping for Each Microservice Database ---
-declare -A db_configs=(
-  ["keycloak"]="${KEYCLOAK_DB_USER}:${KEYCLOAK_DB_PASS}"
-  ["profile"]="${PROFILE_DB_USER}:${PROFILE_DB_PASS}"
-  ["learning"]="${LEARNING_DB_USER}:${LEARNING_DB_PASS}"
-  ["scheduling"]="${SCHEDULING_DB_USER}:${SCHEDULING_DB_PASS}"
-  ["payment"]="${PAYMENT_DB_USER}:${PAYMENT_DB_PASS}"
-)
+# --- Dynamically build db_configs map ---
+declare -A db_configs
+for service in "${services[@]}"; do
+  upper_service=$(echo "$service" | tr '[:lower:]' '[:upper:]')
+  
+  # Construct the variable *names*
+  user_var_name="${upper_service}_DB_USER"
+  pass_var_name="${upper_service}_DB_PASS"
+
+  # Get the *values* of those variables (using indirection)
+  db_user="${!user_var_name}"
+  db_pass="${!pass_var_name}"
+  
+  # Populate the associative array
+  db_configs["$service"]="${db_user}:${db_pass}"
+done
+
 
 # --- Function: Create Role, Database, and Grant Privileges ---
 create_role_and_db() {
