@@ -26,7 +26,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.35.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.72.1
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
 require (

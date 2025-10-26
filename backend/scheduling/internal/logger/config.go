@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"time"
 
 	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/maksmelnyk/scheduling/config"
 )
@@ -44,48 +41,12 @@ type AppLogger struct {
 	logger *zap.Logger
 }
 
-func CustomISO8601TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-	enc.AppendString(t.UTC().Format(time.RFC3339))
-}
-
 func NewAppLogger(cfg config.LogConfig, provider *log.LoggerProvider) (*AppLogger, error) {
 	consoleEncoder := zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
 
 	consoleCore := zapcore.NewCore(consoleEncoder, zapcore.AddSync(os.Stdout), zapcore.InfoLevel)
 
 	cores := []zapcore.Core{consoleCore}
-
-	if cfg.FilePath != "" {
-		if err := os.MkdirAll(filepath.Dir(cfg.FilePath), 0755); err != nil {
-			return nil, fmt.Errorf("create logs directory: %w", err)
-		}
-
-		fileWriter := zapcore.AddSync(&lumberjack.Logger{
-			Filename:   cfg.FilePath,
-			MaxSize:    cfg.MaxSize,
-			MaxAge:     cfg.MaxAge,
-			MaxBackups: cfg.MaxBackups,
-			Compress:   cfg.Compress,
-		})
-
-		encoderConfig := zapcore.EncoderConfig{
-			TimeKey:     "timestamp",
-			LevelKey:    "level",
-			MessageKey:  "message",
-			EncodeTime:  CustomISO8601TimeEncoder,
-			EncodeLevel: zapcore.CapitalLevelEncoder,
-		}
-
-		fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
-
-		fileLevel := zapcore.InfoLevel
-		if level, err := zapcore.ParseLevel(cfg.Level); err == nil {
-			fileLevel = level
-		}
-
-		fileCore := zapcore.NewCore(fileEncoder, fileWriter, fileLevel)
-		cores = append(cores, fileCore)
-	}
 
 	if provider != nil {
 		otelCore := otelzap.NewCore("github.com/maksmelnyk/scheduling/internal/logger", otelzap.WithLoggerProvider(provider))
