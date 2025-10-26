@@ -10,9 +10,7 @@ public class LogProcessor : BaseProcessor<LogRecord>
         if (LogHelper.IsSystemLogCategory(data.CategoryName) && data.LogLevel < LogLevel.Warning)
             return;
 
-        var updatedAttributes = data.Attributes.Select(e => new KeyValuePair<string, object>(LogHelper.ToSnakeCase(e.Key), e.Value)).ToList();
-
-        data.Attributes = updatedAttributes;
+        data.Attributes = [.. data.Attributes.Select(e => new KeyValuePair<string, object>(LogHelper.ToSnakeCase(e.Key), e.Value))];
 
         base.OnEnd(data);
     }

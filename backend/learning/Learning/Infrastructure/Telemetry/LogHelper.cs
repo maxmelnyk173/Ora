@@ -1,4 +1,3 @@
-using Serilog.Events;
 using System.Text;
 
 namespace Learning.Infrastructure.Telemetry;
@@ -9,22 +8,6 @@ public static class LogHelper
     {
         "Microsoft",
         "System"
-    };
-
-    public static readonly HashSet<string> IgnoreLogProperties = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "MessageTemplate",
-        "RequestPath",
-        "RequestId"
-    };
-
-    public static readonly Dictionary<LogEventLevel, string> LogLevelMap = new()
-    {
-        [LogEventLevel.Debug] = "DEBUG",
-        [LogEventLevel.Information] = "INFO",
-        [LogEventLevel.Warning] = "WARN",
-        [LogEventLevel.Error] = "ERROR",
-        [LogEventLevel.Fatal] = "FATAL"
     };
 
     public static bool IsSystemLogCategory(string categoryName)

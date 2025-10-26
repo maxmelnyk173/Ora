@@ -19,22 +19,6 @@ public static class ServiceConfiguration
                 .Enrich.WithProperty("service_name", telemetryOptions.ServiceName)
                 .WriteTo.Console(restrictedToMinimumLevel: LogEventLevel.Information);
 
-            if (!string.IsNullOrWhiteSpace(telemetryOptions.LogFilePath))
-            {
-                serilogConfig.WriteTo.Logger(lc => lc
-                    .Filter.ByExcluding(logEvent =>
-                        logEvent.Properties.TryGetValue("SourceContext", out var sourceContext) &&
-                        LogHelper.IsSystemLogCategory(sourceContext.ToString()) &&
-                        logEvent.Level < LogEventLevel.Warning
-                    )
-                    .WriteTo.File(
-                        formatter: new SnakeCaseLogJsonFormatter(),
-                        path: telemetryOptions.LogFilePath,
-                        rollingInterval: RollingInterval.Day,
-                        fileSizeLimitBytes: telemetryOptions.LogFileSizeLimitBytes
-                    )
-                );
-            }
         }, writeToProviders: true);
     }
 
