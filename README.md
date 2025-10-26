@@ -1,133 +1,118 @@
 # Ora – Learning Platform (Microservices Sandbox Project)
 
-> ⚠️ **Disclaimer:** This is a personal **learning project** used to explore and experiment with different technologies and architectural patterns.
-> The project is still in **early development**, and as such, it **may contain bugs, broken logic, and incomplete features**. Contributions and suggestions are always welcome!
+> ⚠️ **Disclaimer: This is a learning project.**
+> It is used to explore and experiment with different technologies and architectural patterns. The project is in **early development**, and many components are incomplete or experimental. Expect bugs, inconsistent behavior, and rough edges. Contributions and suggestions are always welcome!
 
 ### 🚀 Project Overview
 
-Ora is a full-featured learning platform where educators can offer:
+Ora is a learning platform where educators can create and sell content, and users can purchase and consume it.
 
-* 🎥 **Pre-recorded courses** — Instant access after purchase
-* 👥 **Group sessions** — Live sessions on scheduled dates
-* 👤 **Private sessions** — Booked by users, approved by educators
-* 🌐 **Online courses** — Live, multi-session courses with predefined schedules
+**Key Features:**
+* 🎥 **Pre-recorded Courses:** Instant access after purchase.
+* 👥 **Group & Private Sessions:** Live, scheduled sessions for groups or individuals.
+* 🌐 **Online Courses:** Live, multi-session courses with a predefined schedule.
+* 💬 **Chat:** Private and group messaging between users and educators (planned).
+* 📅 **Scheduling Tools:** Calendars for educators to define availability and manage events.
 
-Regular users can browse, purchase, and consume content — and optionally **apply to become educators** and sell their own content.
-
-The platform will also support:
-* 💬 **Private and group chat** between users and educators (planned)
-* 📅 **Scheduling tools** for educators to define availability and event calendars
-* ⚙️ **Automated booking logic** for online courses, sessions, and meetings
+Users can browse and purchase content, and also apply to become educators to sell their own.
 
 ### 🧱 Architecture
 
-This platform uses a **polyglot microservices architecture** with a containerized environment managed via **Docker Compose**.
+This platform uses a **polyglot microservices architecture**. Each service is a self-contained application with a distinct responsibility, communicating via a mix of synchronous and asynchronous patterns.
+
+- **API Gateway:** An **NGINX** reverse proxy is the single entry point for all external traffic, routing requests to the appropriate backend service.
+- **Communication:** Services use **REST APIs** for direct requests and **RabbitMQ** for event-driven, asynchronous communication.
+- **Authentication:** **Keycloak** is the central identity and authorization provider, securing all services.
 
 ### 📂 Folder Structure
 
 ```bash
 .
 ├── backend/                # Microservices
-│   ├── auth/               # Java + Spring Boot + Keycloak
+│   ├── auth/               # Java + Spring Boot
 │   ├── profile/            # Java + Spring Boot + JPA
 │   ├── learning/           # ASP.NET 9 + EF Core
 │   ├── scheduling/         # Go + Chi + SQLX
 │   ├── payment/            # Python + FastAPI
-│   └── chat/               # (Planned) NestJS + WebRTC
+│   └── chat/               # (Planned) NestJS
 ├── frontend/               # Web client (React + Vite + TS + Tailwind)
 │   └── web/                # Main web app
-├── configs/                # Keycloak realm + Observability configs
-├── scripts/                # Utility scripts
-├── nginx/                  # NGINX reverse proxy + certs
-├── .env.docker             # Environment variables
-└── docker-compose.yml      # Compose file
+├── infra/                  # Infrastructure configuration for Docker & Kubernetes
+│   ├── docker/             # Docker Compose setup for local development
+│   │   ├── docker-compose.yml
+│   │   ├── configs/        # Keycloak realm & observability configs
+│   │   └── scripts/        # Helper scripts (e.g., init-db.sh)
+│   └── minikube/           # Kubernetes setup using Minikube and Helm
+│       ├── platform/       # Platform-level Helm chart (Postgres, Keycloak, etc.)
+│       ├── common/         # Common Helm chart inherited by services
+│       └── scripts/        # Scripts to initialize a k8s cluster
+├── certs/                  # TLS certificates and root CA (mkcert generated)
 ```
 
 ### 🛠️ Technologies
 
-### ✨ Frontend
+Each microservice is built with a technology stack chosen for its specific domain.
 
-* **React + TypeScript + Vite + Tailwind CSS**
-* Hosted via **NGINX**
+| Service        | Language     | Key Frameworks & Libraries         |
+| -------------- | ------------ | ---------------------------------- |
+| **Auth**       | Java 21      | Spring Boot, Keycloak Admin Client |
+| **Profile**    | Java 21      | Spring Boot, JPA, AMQP             |
+| **Learning**   | .NET 9       | ASP.NET, Entity Framework Core     |
+| **Scheduling** | Go 1.24+     | Chi, SQLX, AMQP                    |
+| **Payment**    | Python 3.11+ | FastAPI, SQLAlchemy, aio-pika      |
+| **Chat**       | *(planned)*  | NestJS                             |
+| **Web**        | TypeScript   | React, Vite, Tailwind CSS          |
 
-### 🧩 Backend Microservices
+### 🏗️ Local Environment Setup
 
-| Service        | Language     | Stack                           |
-| -------------- | ------------ | ------------------------------- |
-| **Auth**       | Java 21      | Spring Boot, Keycloak (sidecar) |
-| **Profile**    | Java 21      | Spring Boot, JPA, Logback       |
-| **Learning**   | .NET 9       | ASP.NET, EF, Serilog            |
-| **Scheduling** | Go 1.24+     | Chi, SQLX, Zap logger           |
-| **Payment**    | Python 3.11+ | FastAPI, SQLAlchemy, Loguru     |
-| **Chat**       | *(Planned)*  | NestJS                          |
+The platform is container-native and can be run locally using Docker Compose or deployed to Kubernetes (Minikube).
 
-* **RabbitMQ**: Async messaging between services
-* **PostgreSQL**: Database for all services (one per service)
-* **Liquibase**: DB migrations (enabled via script)
+#### Prerequisites: HTTPS & TLS
 
-### 🔍 Observability Stack
+**This is a critical first step.** The entire platform requires locally trusted TLS certificates to function.
 
-* **OpenTelemetry**: Tracing and metrics
-* **Grafana + Prometheus**: Monitoring dashboards
-* **Loki + Tempo**: Logs and distributed traces
+1.  **Install `mkcert`:** Follow the instructions at [mkcert.dev](https://mkcert.dev/) to install it.
+2.  **Generate Certificates:** Run `mkcert` to generate a certificate for `*.127.0.0.1.nip.io` and `127.0.0.1.nip.io`. These domains are hardcoded and resolve to your local machine.
+3.  **Place Certificates:** Move the generated certificate (`cert.pem`) and key (`cert-key.pem`) files into the `certs/` directory at the project root. You must also include the root CA file (`rootCA.pem`) in this directory so the service containers can trust the certificates.
 
-### 🌐 Infrastructure
+#### 1. Running with Docker Compose
 
-* **NGINX**: Reverse proxy with HTTPS support (certs included)
-* Services communicate internally over Docker networks
-* External access via NGINX gateway
-* Expects SSL certificates to be placed in the `nginx/certs/` directory
-* HTTPS is enabled by default for all public services
+The simplest way to run the entire stack for local development.
+- **Configuration:** Defined in `infra/docker/docker-compose.yml`.
+- **Orchestration:** Spins up all microservices, the frontend, and infrastructure (PostgreSQL, RabbitMQ, Keycloak, etc.).
+- **Networking:** All services are connected to a shared `ora-net` bridge network.
+- **Gateway:** The **NGINX** container serves as the reverse proxy and terminates HTTPS traffic.
+- **Scripts (`/infra/docker/scripts`):**
+  - `init-db.sh`: Initializes PostgreSQL databases on first startup.
+  - `run.ps1`: A PowerShell wrapper for `docker-compose` commands to simplify starting/stopping the environment.
 
-### 🔧 Scripts & Tools
+#### 2. Deploying to Kubernetes (Minikube & Helm)
 
-### ✅ `scripts/init-db.sh`
+The project is also configured for deployment to a local Kubernetes cluster.
+- **Helm Charts:** **Helm** is used to package and manage the applications.
+  - `infra/minikube/platform`: Deploys shared infrastructure (PostgreSQL, Keycloak).
+  - `infra/minikube/common`: A common chart template inherited by each microservice.
+  - `backend/<service>/k8s`: Each microservice contains its own Helm chart.
+- **Scripts (`/infra/minikube/scripts`):**
+  - A collection of PowerShell scripts to automate deploying the entire stack to Minikube.
 
-Initializes PostgreSQL databases for all services.
+### 🔍 Monitoring & Observability
 
-### ▶ `scripts/run.ps1`
+A robust observability stack is a core component of the platform, providing deep insights into application performance and behavior. It is pre-configured for both local and Kubernetes environments.
 
-Run the full stack using Docker Compose with optional parameters:
+- **OpenTelemetry:** The backbone for generating and collecting telemetry data (traces, metrics, logs) across all services.
+- **Prometheus:** For collecting and storing time-series metrics.
+- **Loki:** For log aggregation and querying.
+- **Tempo:** For distributed trace storage.
+- **Grafana:** For visualizing all telemetry data with pre-configured dashboards.
 
-```powershell
-Param(
-    [string]$df = "docker-compose.yml",     # Docker Compose file (default)
-    [string]$ef = ".env.example",           # Environment variable file
-    [switch]$wm = $false                    # Run Liquibase migrations (true/false)
-)
-```
-
-Example usage:
-
-```powershell
-.\scripts\run.ps1 -df "docker-compose.yml" -ef ".env.example" -wm
-```
-
-### 📦 Docker Overview
-
-* All services are containerized and orchestrated via **Docker Compose**.
-* Each backend service runs in its own container and exposes APIs internally.
-* The **frontend web app** is built and served via **NGINX**.
-* The **NGINX container** acts as a reverse proxy and HTTPS termination point.
-
-### 📈 Monitoring & Logging
-
-In the `configs/` folder:
-
-* `otel-config.yml`: OpenTelemetry agent configuration
-* `prometheus.yml`: Prometheus scraping targets
-* `loki-config.yml`, `tempo-config.yml`: Logging and tracing configs
-* `grafana/`: Dashboards and datasource config
-* Each microservice integrates OpenTelemetry + structured logging
+Configurations can be found in `infra/docker/configs` for Docker Compose and within the Helm charts in the `infra/minikube` directory for Kubernetes.
 
 ### 🔐 Authentication & Authorization
 
-* **Keycloak** is used as the authentication and identity provider.
-* A custom **Auth service** wraps Keycloak with domain-specific logic.
-* Realm configuration is stored in `configs/realm-config.json`.
+**Keycloak** is the central authentication provider for the entire platform.
 
-### 🧪 Development Notes
-
-* All services are under **active development** and subject to change.
-* Many components are incomplete or experimental.
-* Expect **bugs, inconsistent behavior, and rough edges** — this is a **learning-first** project.
+- The **Auth service** (Java/Spring Boot) acts as a facade, providing domain-specific logic on top of Keycloak's APIs.
+- The Keycloak realm, clients, and roles are configured to be automatically imported on startup in both environments:
+  - For **Docker Compose**, the configuration is defined in `infra/docker/configs/realm-config.json`.
+  - For **Kubernetes**, the setup is managed via the Keycloak Helm chart and its corresponding `values.yaml` file.
