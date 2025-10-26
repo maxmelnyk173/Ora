@@ -1,0 +1,119 @@
+replicaCount: 1
+
+image:
+  repository: ora-scheduling
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+fullnameOverride: "scheduling-service"
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 2000
+  runAsNonRoot: true
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 8084
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+  hosts:
+    - host: api.127.0.0.1.nip.io
+      paths:
+        - path: /scheduling(/|$)(.*)
+          pathType: ImplementationSpecific
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health/liveness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/readiness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+volumes:
+  - name: tmp-dir
+    emptyDir:
+      medium: Memory
+  - name: root-ca-cert
+    secret:
+      secretName: root-ca-cert
+
+volumeMounts:
+  - name: tmp-dir
+    mountPath: /tmp
+  - name: root-ca-cert
+    mountPath: /etc/ssl/certs/rootCA.crt
+    subPath: rootCA.crt
+    readOnly: true
+
+envVars:
+  - name: SCHEDULING_PORT
+    value: "8084"
+  - name: SCHEDULING_NAME
+    value: "scheduling-service"
+  - name: SCHEDULING_DB_NAME
+    valueFrom:
+      secretKeyRef:
+        name: scheduling-db-secret
+        key: name
+  - name: SCHEDULING_DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: scheduling-db-secret
+        key: username
+  - name: SCHEDULING_DB_PASS
+    valueFrom:
+      secretKeyRef:
+        name: scheduling-db-secret
+        key: password
+  - name: LEARNING_URL
+    value: "http://learning-service:8083"
+  - name: POSTGRES_DRIVER
+    value: "postgres"
