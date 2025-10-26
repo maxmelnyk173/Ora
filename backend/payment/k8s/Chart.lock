@@ -1,0 +1,6 @@
+dependencies:
+- name: common
+  repository: file://../../../infra/minikube/helm-charts/common
+  version: 0.1.0
+digest: sha256:621674575e7efeae95a6ca0bda99f4f5e2d7b6ad7403d06488f3980c07fc5132
+generated: "2025-09-28T15:19:29.1183438+02:00"

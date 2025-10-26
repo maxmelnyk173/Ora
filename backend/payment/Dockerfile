@@ -6,7 +6,8 @@ ENV PYTHONUNBUFFERED=1
 RUN apk update && apk add --no-cache \
     gcc \
     python3-dev \
-    postgresql-dev
+    postgresql-dev \
+    ca-certificates
 
 RUN adduser --disabled-password --gecos "" --uid 1001 appuser
 
