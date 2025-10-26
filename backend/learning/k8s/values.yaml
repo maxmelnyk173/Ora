@@ -1,0 +1,186 @@
+replicaCount: 1
+
+image:
+  repository: ora-learning
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+fullnameOverride: "learning-service"
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 2000
+  runAsNonRoot: true
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  port: 8083
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+  hosts:
+    - host: api.127.0.0.1.nip.io
+      paths:
+        - path: /learning(/|$)(.*)
+          pathType: ImplementationSpecific
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /health/liveness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health/readiness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+volumes:
+  - name: tmp-dir
+    emptyDir:
+      medium: Memory
+  - name: root-ca-cert
+    secret:
+      secretName: root-ca-cert
+
+volumeMounts:
+  - name: tmp-dir
+    mountPath: /tmp
+  - name: root-ca-cert
+    mountPath: /etc/ssl/certs/rootCA.crt
+    subPath: rootCA.crt
+    readOnly: true
+
+envVars:
+  - name: LEARNING_PORT
+    value: "8083"
+  - name: LEARNING_NAME
+    value: "learning-service"
+  - name: ASPNETCORE_ENVIRONMENT
+    value: "Development"
+  - name: ASPNETCORE_URLS
+    value: "http://+:8083"
+  - name: DbOptions__Host
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: database.postgres.host
+  - name: DbOptions__Port
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: database.postgres.port
+  - name: DbOptions__Name
+    valueFrom:
+      secretKeyRef:
+        name: learning-db-secret
+        key: name
+  - name: DbOptions__Username
+    valueFrom:
+      secretKeyRef:
+        name: learning-db-secret
+        key: username
+  - name: DbOptions__Password
+    valueFrom:
+      secretKeyRef:
+        name: learning-db-secret
+        key: password
+  - name: KeycloakOptions__Authority
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: auth.keycloak.issuerUri
+  - name: KeycloakOptions__Audience
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: auth.keycloak.audience
+  - name: KeycloakOptions__RoleAddress
+    value: "realm_access.roles"
+  - name: TelemetryOptions__OpenTelemetryEndpoint
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: observability.otelCollector.grpcEndpoint
+  - name: RabbitMqOptions__HostName
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.host
+  - name: RabbitMqOptions__VirtualHost
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.vhost
+  - name: RabbitMqOptions__Port
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.port
+  - name: RabbitMqOptions__UserName
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.user
+  - name: RabbitMqOptions__Password
+    valueFrom:
+      secretKeyRef:
+        name: rabbitmq-auth
+        key: admin-password
+  - name: RabbitMqOptions__Exchange
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.exchange
+  - name: RabbitMqOptions__DeadLetterExchange
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.dlqExchange
+  - name: RabbitMqOptions__MessageTtl
+    valueFrom:
+      configMapKeyRef:
+        name: platform-config
+        key: messaging.rabbitmq.messageTTL
