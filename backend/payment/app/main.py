@@ -11,7 +11,7 @@ from app.config.settings import RabbitMqSettings, Settings
 from app.exceptions.exception_handlers import setup_exception_handlers
 from app.infrastructure.messaging.manager import RabbitMqApplicationManager
 from app.infrastructure.telemetry.config import configure_telemetry
-from app.infrastructure.database.config import engine
+from app.infrastructure.database.config import SessionLocal, engine
 from app.infrastructure.dependencies import get_settings, get_token_validator
 from app.middleware.auth import AuthMiddleware
 from app.middleware.logging import RequestLoggingMiddleware
@@ -77,10 +77,10 @@ FastAPIInstrumentor.instrument_app(app=app)  # type: ignore
 
 app.add_middleware(
     middleware_class=CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=settings.app.allow_origins,
-    allow_methods=settings.app.allow_methods,
-    allow_headers=settings.app.allow_headers,
+    allow_credentials=settings.cors.allow_credentials,
+    allow_origins=settings.cors.allow_origins,
+    allow_methods=settings.cors.allow_methods,
+    allow_headers=settings.cors.allow_headers,
 )
 
 app.add_middleware(middleware_class=RequestLoggingMiddleware)
@@ -88,10 +88,26 @@ app.add_middleware(middleware_class=RequestLoggingMiddleware)
 app.add_middleware(
     middleware_class=AuthMiddleware,
     validator=get_token_validator(),
-    public_apis=["/docs", "/openapi.json"],
+    public_apis=["/docs", "/openapi", "/health"],
 )
 
-setup_exception_handlers(app)
+setup_exception_handlers(app=app)
+
+
+@app.get(path="/health/liveness")
+async def liveness() -> dict[str, str]:
+    return {"status": "alive"}
+
+
+@app.get(path="/health/readiness")
+async def readiness() -> dict[str, str]:
+    try:
+        async with SessionLocal() as session:
+            await session.execute(statement=text(text="SELECT 1"))
+        return {"status": "ready"}
+    except Exception:
+        return {"status": "not ready"}
+
 
 app.include_router(router=payment_router, prefix="/api/v1/payments")
 

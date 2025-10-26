@@ -24,8 +24,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        if request.method == "OPTIONS" or request.url.path in self.public_apis:
+        if request.method == "OPTIONS":
             return await call_next(request)
+
+        for public_api in self.public_apis:
+            if request.url.path.startswith(public_api):
+                return await call_next(request)
 
         try:
             token: str | None = request.headers.get("Authorization")
