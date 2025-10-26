@@ -1,0 +1,147 @@
+replicaCount: 1
+
+image:
+  repository: ora-profile
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+fullnameOverride: "profile-service"
+
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 2000
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop: ["ALL"]
+
+service:
+  type: ClusterIP
+  port: 8082
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+  hosts:
+    - host: api.127.0.0.1.nip.io
+      paths:
+        - path: /profile(/|$)(.*)
+          pathType: ImplementationSpecific
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+livenessProbe:
+  httpGet:
+    path: /actuator/health/liveness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /actuator/health/readiness
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  failureThreshold: 3
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+volumes:
+  - name: tmp-dir
+    emptyDir: {}
+  - name: custom-truststore
+    emptyDir: {}
+  - name: root-ca-cert
+    secret:
+      secretName: root-ca-cert
+
+initContainers:
+  - name: truststore-builder
+    image: eclipse-temurin:21-jre
+    securityContext:
+      runAsUser: 0
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        echo "Building custom truststore..."
+        cp $JAVA_HOME/lib/security/cacerts /truststore/cacerts
+        keytool -importcert -noprompt -trustcacerts \
+          -file /etc/ssl/certs/rootCA.crt \
+          -alias mkcert-root \
+          -keystore /truststore/cacerts -storepass changeit
+        mv /truststore/cacerts /truststore/custom-cacerts
+        echo "Custom truststore ready."
+    volumeMounts:
+      - name: custom-truststore
+        mountPath: /truststore
+      - name: root-ca-cert
+        mountPath: /etc/ssl/certs/rootCA.crt
+        subPath: rootCA.crt
+
+volumeMounts:
+  - name: custom-truststore
+    mountPath: /etc/ssl/certs/custom-cacerts
+    subPath: custom-cacerts
+    readOnly: true
+  - name: root-ca-cert
+    mountPath: /etc/ssl/certs/rootCA.crt
+    subPath: rootCA.crt
+    readOnly: true
+  - name: tmp-dir
+    mountPath: /tmp
+
+envVars:
+  - name: JAVA_TOOL_OPTIONS
+    value: "-Djavax.net.ssl.trustStore=/etc/ssl/certs/custom-cacerts -Djavax.net.ssl.trustStorePassword=changeit"
+  - name: PROFILE_PORT
+    value: "8082"
+  - name: PROFILE_NAME
+    value: "profile-service"
+  - name: PROFILE_DB_NAME
+    valueFrom:
+      secretKeyRef:
+        name: profile-db-secret
+        key: name
+  - name: PROFILE_DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: profile-db-secret
+        key: username
+  - name: PROFILE_DB_PASS
+    valueFrom:
+      secretKeyRef:
+        name: profile-db-secret
+        key: password
