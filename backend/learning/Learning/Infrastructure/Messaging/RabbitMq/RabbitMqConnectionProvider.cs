@@ -114,6 +114,8 @@ public class RabbitMqConnectionProvider : IAsyncDisposable
             {
                 _logger.LogError(ex, "Error disposing RabbitMQ connection.");
             }
+
+            GC.SuppressFinalize(this);
         }
     }
 }

@@ -7,7 +7,10 @@ public static class ServiceConfiguration
 {
     public static IServiceCollection AddRabbitMq(this IServiceCollection services, IConfiguration configuration)
     {
-        services.Configure<RabbitMqOptions>(configuration.GetSection(nameof(RabbitMqOptions)));
+        services.AddOptions<RabbitMqOptions>()
+            .BindConfiguration(nameof(RabbitMqOptions))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
         services.AddSingleton<RabbitMqConnectionProvider>();
         services.AddSingleton<IMessagePublisher, RabbitMqPublisher>();
