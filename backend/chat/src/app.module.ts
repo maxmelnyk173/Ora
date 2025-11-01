@@ -1,10 +1,19 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
+import serverConfig from './config/server.config';
+import corsConfig from './config/cors.config';
+import loggingConfig from './config/logging.config';
 
 @Module({
-  imports: [],
-  controllers: [AppController],
-  providers: [AppService],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [serverConfig, corsConfig, loggingConfig],
+      envFilePath: ['.env.local', '.env'],
+      cache: true,
+    }),
+  ],
+  controllers: [],
+  providers: [],
 })
 export class AppModule {}

@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.1.8",
+    "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.8",
     "@nestjs/platform-express": "^11.1.8",
     "@opentelemetry/api": "^1.9.0",
@@ -29,6 +30,8 @@
     "@opentelemetry/exporter-prometheus": "^0.207.0",
     "@opentelemetry/exporter-trace-otlp-grpc": "^0.207.0",
     "@opentelemetry/sdk-node": "^0.207.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
     "jose": "^6.1.0",
     "nestjs-otel": "^7.0.1",
     "pino": "^10.1.0",
