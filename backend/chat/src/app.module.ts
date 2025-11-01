@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import serverConfig from './config/server.config';
 import corsConfig from './config/cors.config';
 import loggingConfig from './config/logging.config';
+import { HealthModule } from './features/health/health.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import loggingConfig from './config/logging.config';
       envFilePath: ['.env.local', '.env'],
       cache: true,
     }),
+    HealthModule,
   ],
   controllers: [],
   providers: [],
