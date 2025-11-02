@@ -4,9 +4,15 @@ import { ConfigType } from '@nestjs/config';
 import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import serverConfig from './config/server.config';
 import corsConfig from './config/cors.config';
+import { LoggerService } from './infrastructure/logging/logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    bufferLogs: true,
+  });
+
+  const loggerService = app.get(LoggerService);
+  app.useLogger(loggerService);
 
   const serverCfg = app.get<ConfigType<typeof serverConfig>>(serverConfig.KEY);
   const corsCfg = app.get<ConfigType<typeof corsConfig>>(corsConfig.KEY);
@@ -47,8 +53,8 @@ async function bootstrap() {
 
   const logger = new Logger('Bootstrap');
   logger.log(
-    `🚀 Server "${serverCfg.name}" v${serverCfg.version} running on http://localhost:${serverCfg.port}`,
+    `Server "${serverCfg.name}" v${serverCfg.version} running on http://localhost:${serverCfg.port}`,
   );
-  logger.log(`🌍 Environment: ${serverCfg.environment}`);
+  logger.log(`Environment: ${serverCfg.environment}`);
 }
 bootstrap();
