@@ -10,45 +10,65 @@ import { Response } from 'express';
 import { BaseException } from '../exceptions/base.exception';
 import { ForbiddenException } from '../exceptions/forbidden.exception';
 import { NotFoundException } from '../exceptions/not-found.exception';
+import { UnauthorizedException } from '../exceptions/unauthorized.exception';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
 
+  private readonly statusMap = new Map<Function, number>([
+    [NotFoundException, HttpStatus.NOT_FOUND],
+    [ForbiddenException, HttpStatus.FORBIDDEN],
+    [UnauthorizedException, HttpStatus.UNAUTHORIZED],
+    [BaseException, HttpStatus.INTERNAL_SERVER_ERROR],
+  ]);
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
 
+    const { statusCode, message, code, details } =
+      this.normalizeException(exception);
+
+    return this.writeErrorResponse(
+      response,
+      statusCode,
+      message,
+      code,
+      details,
+    );
+  }
+
+  private normalizeException(exception: unknown): {
+    statusCode: number;
+    message: string;
+    code?: string;
+    details?: any;
+  } {
     let statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Unhandled exception occurred';
-    let code = 'ERROR_INTERNAL_SERVER';
-    let details: any = undefined;
+    let code: string | undefined;
+    let details: any;
 
-    if (exception instanceof NotFoundException) {
-      statusCode = HttpStatus.NOT_FOUND;
-      message = exception.message;
-      code = exception.code ?? 'ERROR_NOT_FOUND';
-      details = exception.details;
-    } else if (exception instanceof ForbiddenException) {
-      statusCode = HttpStatus.FORBIDDEN;
-      message = exception.message;
-      code = exception.code ?? 'ERROR_FORBIDDEN';
-      details = exception.details;
-    } else if (exception instanceof BaseException) {
-      statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = exception.message;
-      code = exception.code ?? 'ERROR_BASE_EXCEPTION';
-      details = exception.details;
-    } else if (exception instanceof HttpException) {
+    for (const [ctor, status] of this.statusMap) {
+      if (exception instanceof (ctor as any)) {
+        statusCode = status;
+        message = (exception as any).message;
+        code = (exception as any).code;
+        details = (exception as any).details;
+        return { statusCode, message, code, details };
+      }
+    }
+
+    if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const res = exception.getResponse();
       if (typeof res === 'string') {
         message = res;
-        code = 'ERROR_HTTP_EXCEPTION';
-      } else if (typeof res === 'object' && res !== null) {
+      } else if (res && typeof res === 'object') {
         const resObj = res as any;
         message = resObj.message ?? message;
-        code = resObj.code ?? 'ERROR_HTTP_EXCEPTION';
+        code = resObj.code;
         details = resObj.details;
       }
     } else if (exception instanceof Error) {
@@ -61,28 +81,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    return this.writeErrorResponse(
-      response,
-      statusCode,
-      message,
-      code,
-      details,
-    );
+    return { statusCode, message, code, details };
   }
 
   private writeErrorResponse(
     response: Response,
     statusCode: number,
     message: string,
-    code: string,
-    details: any,
+    code?: string,
+    details?: any,
   ) {
-    const errorResponse = {
-      message,
-      code,
-      details,
-    };
-
-    response.status(statusCode).json(errorResponse);
+    response.status(statusCode).json({ message, code, details });
   }
 }
